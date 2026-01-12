@@ -84,7 +84,7 @@ class HonghuiAirOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """初始化选项流程."""
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(self, user_input=None) -> FlowResult:
         """管理选项."""
@@ -103,15 +103,15 @@ class HonghuiAirOptionsFlow(config_entries.OptionsFlow):
 
             if not errors:
                 # 更新条目数据
-                data = {**self.config_entry.data}
+                data = {**self._config_entry.data}
                 data.update(user_input)
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry, data=data
+                    self._config_entry, data=data
                 )
                 return self.async_create_entry(title="", data={})
 
         # 获取现有配置
-        data = {**self.config_entry.data}
+        data = {**self._config_entry.data}
 
         # 创建选项表单
         return self.async_show_form(
