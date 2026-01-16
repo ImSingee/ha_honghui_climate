@@ -403,6 +403,9 @@ class HonghuiAirClimate(ClimateEntity):
     @prevent_recursion
     async def async_set_temperature(self, **kwargs) -> None:
         """设置温度."""
+        allow_when_off = bool(kwargs.pop("_allow_when_off", False))
+        requested_hvac_mode = kwargs.get("hvac_mode")
+        
         # 检查目标实体ID，防止递归调用
         entity_id = self.entity_id  # 获取当前实体的完整实体ID
         if self._ac_entity_id == entity_id or self._ac_entity_id.startswith(f"{DOMAIN}."):
@@ -438,6 +441,15 @@ class HonghuiAirClimate(ClimateEntity):
             ac_state = self.hass.states.get(self._ac_entity_id)
             if ac_state is None:
                 _LOGGER.error("无法设置温度: 目标空调实体 %s 不存在", self._ac_entity_id)
+                return
+
+            # 当空调状态为关闭且未同步修改 hvac_mode 时忽略设置温度的请求（源空调可能因为设置温度而被无意开机）
+            if (
+                ac_state.state == HVACMode.OFF.value
+                and requested_hvac_mode is None
+                and not allow_when_off
+            ):
+                _LOGGER.info("源空调处于关闭状态，已忽略设置温度请求: %s", service_data[ATTR_TEMPERATURE])
                 return
                 
             # 检查目标空调是否支持温度设置
@@ -496,7 +508,9 @@ class HonghuiAirClimate(ClimateEntity):
                 if ac_state and ATTR_TEMPERATURE not in ac_state.attributes:
                     _LOGGER.debug("模式变化后目标温度丢失，尝试重新设置: %s", current_target_temp)
                     # 重新设置温度
-                    await self.async_set_temperature(**{ATTR_TEMPERATURE: current_target_temp})
+                    await self.async_set_temperature(
+                        **{ATTR_TEMPERATURE: current_target_temp, "_allow_when_off": True}
+                    )
                     
             _LOGGER.debug("成功设置HVAC模式: %s", hvac_mode)
         except Exception as e:
